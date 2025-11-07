@@ -1,6 +1,6 @@
 <?xml version='1.0'?>
 <sdf version='1.7'>
-  <model name='group1_custom.world'>
+  <model name='groupA1_custom.world'>
     <pose>-3.1825 2.8055 0 0 -0 0</pose>
     <link name='Wall_0'>
       <collision name='Wall_0_Collision'>
