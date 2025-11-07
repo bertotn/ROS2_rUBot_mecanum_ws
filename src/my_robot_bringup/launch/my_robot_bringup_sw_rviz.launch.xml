@@ -4,47 +4,37 @@
     <arg name="x0" default="0.0" description="Initial X position of the robot" />
     <arg name="y0" default="0.0" description="Initial Y position of the robot" />
     <arg name="yaw0" default="0.0" description="Initial Yaw orientation of the robot (radians)" />
-    <arg name="robot" default="rubot/rubot_mecanum.urdf"
+    <arg name="robot" default="rubot/rubot_mecanum_custom.urdf"
          description="Name of the URDF file (e.g., rubot_limo.urdf)" />
-    <arg name="custom_world" default="square3m_walls.world"
+    <arg name="custom_world" default="group1_custom.world"
           description="Path to the Gazebo world file to load" />
+
     <let name="robot_path"
          value="$(find-pkg-share my_robot_description)/urdf/$(var robot)" />
     <let name="world_path"
          value="$(find-pkg-share my_robot_bringup)/worlds/$(var custom_world)" />
     <let name="rviz_config_path"
           value="$(find-pkg-share my_robot_bringup)/rviz/urdf_lidar_cam.rviz" />
-    <node pkg="joint_state_publisher" exec="joint_state_publisher">
-        <param name="use_sim_time" value="$(var use_sim_time)" />
-    </node>
+
+    <!-- Robot state publisher node -->
     <node pkg="robot_state_publisher" exec="robot_state_publisher">
         <param name="robot_description" value="$(command 'xacro $(var robot_path)')" />
         <param name="use_sim_time" value="$(var use_sim_time)" />
     </node>
+
+    <!-- Gazebo node -->
     <include file="$(find-pkg-share gazebo_ros)/launch/gazebo.launch.py">
         <arg name="world" value="$(var world_path)" />
         <arg name="use_sim_time" value="$(var use_sim_time)" />
     </include>
+
+    <!-- Gazebo spawn entity node -->
     <node pkg="gazebo_ros" exec="spawn_entity.py"
           args="-topic robot_description -entity my_robot -x $(var x0) -y $(var y0) -Y $(var yaw0)" />
 
+    <!-- RViz node -->
     <node pkg="rviz2" exec="rviz2" output="screen"
           args="-d $(var rviz_config_path)">
         <param name="use_sim_time" value="$(var use_sim_time)"/> 
-     </node>
-</launch>
-
-<launch>
-  <arg name="robot" default="rubot/rubot_mecanum_custom.urdf"/>
-  <arg name="custom_world" default="my_custom_world.world"/>
-  <arg name="x0" default="0.0"/>
-  <arg name="y0" default="0.0"/>
-  <arg name="yaw0" default="1.57"/>
-  <param name="use_sim_time" value="true"/>
-  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen">
-    <param name="use_sim_time" value="true"/>
-  </node>
-
-  <node name="gazebo" pkg="gazebo_ros" type="gzserver" args="$(arg custom_world)" output="screen"/>
-  <node name="rviz" pkg="rviz2" type="rviz2" args="-d $(find my_robot_description)/rviz/default.rviz"/>
+    </node>
 </launch>
