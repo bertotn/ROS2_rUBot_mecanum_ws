@@ -175,4 +175,5 @@ rm -f ~/.git-credentials
 git credential-cache exit 
 gh auth logout -h github.com -y 
 ````
+> This can be done with the instruction: `rm -f ~/.gitconfig ~/.git-credentials`
 - Remember to 'Sign out' in VS Code: Settings → Accounts → Sign out from GitHub
