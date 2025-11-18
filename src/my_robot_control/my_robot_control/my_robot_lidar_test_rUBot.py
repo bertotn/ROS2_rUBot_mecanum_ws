@@ -29,8 +29,8 @@ class LidarTest(Node):
 
         # Indices for specific angles in rUBot (Lidar: -180deg to 180deg at 0.5deg/index)
         index_0_deg = int((0 - angle_min_deg -180)/ angle_increment_deg)
-        index_neg90_deg = int((-90 - angle_min_deg) / angle_increment_deg)
-        index_pos90_deg = int((90 - angle_min_deg) / angle_increment_deg)
+        index_neg90_deg = int((-90 - angle_min_deg -180) / angle_increment_deg)
+        index_pos90_deg = int((90 - angle_min_deg -180) / angle_increment_deg)
         dist_0_deg = scan.ranges[index_0_deg]
         dist_neg90_deg = scan.ranges[index_neg90_deg]
         dist_pos90_deg = scan.ranges[index_pos90_deg]
