@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="vx" default="0.2"/>
+    <arg name="vy" default="0.0"/>
+    <arg name="w" default="0.0"/>
+    <arg name="td" default="5.0"/>
+
+    <node
+        pkg="my_robot_control" exec="my_robot_control_lab_exec" name="robot_control_node" output="screen">
+        <param name="vx" value="$(var vx)"/>
+        <param name="vy" value="$(var vy)"/>
+        <param name="w" value="$(var w)"/>
+        <param name="td" value="$(var td)"/>
+    </node>
+</launch>
