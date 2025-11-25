@@ -68,16 +68,18 @@ To proceed with the signal identification we first bringup the robot and navigat
 
 You can make a prediction of the signal that the robot find on its path to target pose:
 - for 1 test image (use ``picture_prediction_yolo.py``). 
-- for video images from robot camera when moving to target (use ``rt_prediction_yolo.py``)
+- for video images from robot camera when moving to target (use ``rubot_navigation_yolo.py``)
+- The schematic nodes, topics and messages are shown below:
+    ![](./Images/07_Yolo/09_yolo_detection_topics.png)
 
 **Software** test in Gazebo: 
-- Use the ``limo_rt_prediction_yolo.py`` after the navigation node is launched.
+- Use the ``rubot_navigation_yolo.py`` after the navigation node is launched.
     ````shell
     ros2 run my_robot_ai_identification limo_rt_prediction_yolo_exec
     ````
     > You have to verify the model path to '/home/user/ROS2_rUBot_mecanum_ws/src/AI_Projects/my_robot_ai_identification/models/yolov8n_custom.pt
 
-    > If you are using rUBot robot change the exec to `rubot_rt_prediction_yolo_exec`
+    > If you are using rUBot robot change the exec to `rubot_navigation_yolo_exec`
 
     > Verify also the the camera topic if you are using rUBot or Limo
 
@@ -117,13 +119,14 @@ Consider:
 - If YOLO detects a sign AND the robot is within "front_distance" parameter value of the corresponding sign position, then the robot reacts.
 - Specify the sign positions in a `yolo_signs.yaml` file as follows:
     ```yaml
-    sign_positions:
+    sign_positions: |
       STOP:      [2.30, -1.00]   # STOP sign position (x, y)
       Ceda:      [5.00,  0.20]   # Yield (Ceda el paso)
       Derecha:   [7.10,  1.40]   # Turn right
       Izquierda: [7.10, -1.40]   # Turn left
       Prohibido: [9.00,  0.00]   # No entry / forbidden
     ````
+    > Include "|" (vertical bar) to specify multiline string in YAML.
 - To launch the robot actuation node after prediction, use:
     ````shell
     ros2 launch my_robot_ai_identification rubot_navigation_yolo.launch.py
