@@ -9,8 +9,8 @@ import math
 class RobotSelfControlHolonomic(Node):
 
 
-    def _init_(self):
-        super()._init_('robot_selfcontrol_holonomic_node')
+    def __init__(self):
+        super().__init__('robot_selfcontrol_holonomic_node')
 
 
         # Configurable parameters
@@ -184,5 +184,5 @@ def main(args=None):
 
 
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     main()
