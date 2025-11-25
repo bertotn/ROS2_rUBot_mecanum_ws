@@ -32,7 +32,8 @@ setup(
             'my_robot_wallfollower_LIMO_exec = my_robot_control.my_robot_wallfollower_LIMO:main',
             'my_robot_go2pose_exec = my_robot_control.my_robot_go2pose:main',
             'my_robot_lidar_test_rUBot_exec = my_robot_control.my_robot_lidar_test_rUBot:main',
-            'my_robot_selfcontrol_holonomic_exec = my_robot_control.my_robot_selfcontrol_holonomic:main'
+            'my_robot_selfcontrol_holonomic_exec = my_robot_control.my_robot_selfcontrol_holonomic:main',
+            'my_robot_control_lab_exec = my_robot_control.my_robot_control_lab:main'
         ],
     },
 )
