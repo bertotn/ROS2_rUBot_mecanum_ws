@@ -4,6 +4,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
 
 
 class WallFollowerHolonomic(Node):
@@ -14,9 +15,10 @@ class WallFollowerHolonomic(Node):
         self.declare_parameter('distance_limit', 0.5)    # desired distance to walls
         self.declare_parameter('forward_speed', 0.20)    # nominal forward speed
         self.declare_parameter('strafe_speed', 0.20)     # sideways speed (|vy|)
-        self.declare_parameter('turn_speed', 0.40)       # angular speed (if needed)
+        self.declare_parameter('turn_speed', 0.40)       # max angular speed
         self.declare_parameter('time_to_stop', 30.0)     # auto-stop
         self.declare_parameter('tolerance', 0.05)        # not used for holonomic rules now
+        self.declare_parameter('k_ang', 1.0)             # proportional gain for yaw control
 
         self.base_distance = float(self.get_parameter('distance_limit').value)
         self.v_lin = float(self.get_parameter('forward_speed').value)
@@ -24,13 +26,21 @@ class WallFollowerHolonomic(Node):
         self.v_ang = float(self.get_parameter('turn_speed').value)
         self.time_to_stop = float(self.get_parameter('time_to_stop').value)
         self.tol = float(self.get_parameter('tolerance').value)
+        self.k_ang = float(self.get_parameter('k_ang').value)
 
         # Last commanded twist (will be published periodically)
         self.cmd = Twist()
 
+        # Odometry / orientation
+        self.current_yaw = 0.0
+        self.odom_received = False
+
         # ROS 2 entities
         self.subscription = self.create_subscription(
             LaserScan, '/scan', self.laser_callback, qos_profile_sensor_data
+        )
+        self.odom_sub = self.create_subscription(
+            Odometry, '/odom', self.odom_callback, 10
         )
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
 
@@ -46,8 +56,27 @@ class WallFollowerHolonomic(Node):
         self.start_time_s = self.get_clock().now().nanoseconds * 1e-9
 
         self.get_logger().info(
-            "WallFollower HOLONOMIC â€“ vx, vy, w with full left/right handling."
+            "WallFollower HOLONOMIC – vx, vy, w with full left/right handling and yaw alignment."
         )
+
+    # --------------------------------------------------------------------
+    def odom_callback(self, msg: Odometry):
+        """Read current yaw from /odom."""
+        q = msg.pose.pose.orientation
+        # Yaw from quaternion (z-w)
+        siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        self.current_yaw = math.atan2(siny_cosp, cosy_cosp)
+        self.odom_received = True
+
+    # --------------------------------------------------------------------
+    def normalize_angle(self, angle):
+        """Normalize angle to [-pi, pi]."""
+        while angle > math.pi:
+            angle -= 2.0 * math.pi
+        while angle < -math.pi:
+            angle += 2.0 * math.pi
+        return angle
 
     # --------------------------------------------------------------------
     def stop_watchdog(self):
@@ -167,71 +196,86 @@ class WallFollowerHolonomic(Node):
         closest_region = min(region_mins, key=region_mins.get)
         closest_dist = region_mins[closest_region]
 
-        # If nothing is near, go forward
+        # --- 1) Decide ONLY linear velocities segons la paret ---
         if closest_dist == float('inf') or closest_dist > self.base_distance:
+            # Nothing close → go forward
             twist.linear.x = self.v_lin
             twist.linear.y = 0.0
-            twist.angular.z = 0.0
-            action = "No close wall â†’ move FORWARD"
+            action = "No close wall → move FORWARD"
         else:
-            # Holonomic behaviors based on closest region
-
             if closest_region == "FRONT":
-                # When minimum distance is in the front side â†’ move LEFT
+                # Paret davant → mou-te cap a l'esquerra
                 twist.linear.x = 0.0
                 twist.linear.y = self.v_strafe
-                twist.angular.z = 0.0
-                action = f"FRONT {closest_dist:.2f} m â†’ move LEFT (vy>0)"
+                action = f"FRONT {closest_dist:.2f} m → move LEFT (vy>0)"
 
             elif closest_region == "FR_RIGHT":
-                # When minimum distance is in front-right â†’ move front-left
+                # Paret front-dreta → mou-te front-esquerra
                 twist.linear.x = self.v_lin
                 twist.linear.y = self.v_strafe
-                twist.angular.z = 0.0
-                action = f"FRONT-RIGHT {closest_dist:.2f} m â†’ move FRONT-LEFT"
+                action = f"FRONT-RIGHT {closest_dist:.2f} m → move FRONT-LEFT"
 
             elif closest_region == "RIGHT":
-                # When minimum distance is in right â†’ move forward parallel to wall
+                # Paret dreta → mou-te endavant (seguint la paret a la dreta)
                 twist.linear.x = self.v_lin
                 twist.linear.y = 0.0
-                twist.angular.z = 0.0
-                action = f"RIGHT {closest_dist:.2f} m â†’ move FORWARD (parallel to right wall)"
+                action = f"RIGHT {closest_dist:.2f} m → move FORWARD (parallel to right wall)"
 
             elif closest_region == "BACK_RIGHT":
-                # When minimum distance is in back-right â†’ move front-right
+                # Paret darrere-dreta → mou-te front-dreta
                 twist.linear.x = self.v_lin
                 twist.linear.y = -self.v_strafe
-                twist.angular.z = 0.0
-                action = f"BACK-RIGHT {closest_dist:.2f} m â†’ move FRONT-RIGHT"
+                action = f"BACK-RIGHT {closest_dist:.2f} m → move FRONT-RIGHT"
 
             elif closest_region == "BACK":
-                # When minimum distance is in back â†’ move RIGHT
+                # Paret darrere → mou-te cap a la dreta
                 twist.linear.x = 0.0
                 twist.linear.y = -self.v_strafe
-                twist.angular.z = 0.0
-                action = f"BACK {closest_dist:.2f} m â†’ move RIGHT (vy<0)"
+                action = f"BACK {closest_dist:.2f} m → move RIGHT (vy<0)"
 
-            # NEW: Left side behaviors
             elif closest_region == "FR_LEFT":
-                # Wall front-left â†’ move front-right (down in y)
+                # Paret front-esquerra → mou-te BACK-LEFT (exemple)
                 twist.linear.x = -self.v_lin
                 twist.linear.y = self.v_strafe
-                twist.angular.z = 0.0
-                action = f"FRONT-LEFT {closest_dist:.2f} m â†’ move BACK-LEFT"
+                action = f"FRONT-LEFT {closest_dist:.2f} m → move BACK-LEFT"
 
             elif closest_region == "LEFT":
-                # Wall directly on left â†’ move DOWN/right (negative y)
+                # Paret esquerra → mou-te enrere (o com vulguis)
                 twist.linear.x = -self.v_lin
                 twist.linear.y = 0.0
-                twist.angular.z = 0.0
-                action = f"LEFT {closest_dist:.2f} m â†’ move DOWN (vy<0)"
+                action = f"LEFT {closest_dist:.2f} m → move BACKWARD"
 
             elif closest_region == "BACK_LEFT":
-                # Wall back-left â†’ move front-left (up in y)
+                # Paret darrere-esquerra → mou-te BACK-RIGHT
                 twist.linear.x = -self.v_lin
                 twist.linear.y = -self.v_strafe
+                action = f"BACK-LEFT {closest_dist:.2f} m → move BACK-RIGHT"
+
+        # --- 2) Orientació: fer que el robot miri cap a la direcció de moviment ---
+        vx = twist.linear.x
+        vy = twist.linear.y
+
+        if abs(vx) < 1e-3 and abs(vy) < 1e-3:
+            # Si no hi ha moviment → no girem
+            twist.angular.z = 0.0
+        else:
+            # Angle de la direcció de moviment en l'eix del robot
+            desired_yaw = math.atan2(vy, vx)   # ex: vx=0, vy>0 → +90º
+
+            if self.odom_received:
+                yaw_error = self.normalize_angle(desired_yaw - self.current_yaw)
+                w_cmd = self.k_ang * yaw_error
+
+                # Limitem la velocitat angular màxima
+                if w_cmd > self.v_ang:
+                    w_cmd = self.v_ang
+                elif w_cmd < -self.v_ang:
+                    w_cmd = -self.v_ang
+
+                twist.angular.z = w_cmd
+            else:
+                # Encara no tenim /odom → no girem per seguretat
                 twist.angular.z = 0.0
-                action = f"BACK-LEFT {closest_dist:.2f} m â†’ move BACK-RIGHT"
 
         # Update last commanded twist
         self.cmd = twist
