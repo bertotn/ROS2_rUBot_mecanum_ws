@@ -11,14 +11,14 @@ class WallFollowerHolonomic(Node):
     def __init__(self):
         super().__init__('wall_follower_holonomic_node')
 
-        # Parameters
-        self.declare_parameter('distance_limit', 0.5)    # desired distance to walls
-        self.declare_parameter('forward_speed', 0.20)    # nominal forward speed
-        self.declare_parameter('strafe_speed', 0.20)     # sideways speed (|vy|)
-        self.declare_parameter('turn_speed', 0.40)       # max angular speed
+        # Parameters (velocitats reduïdes)
+        self.declare_parameter('distance_limit', 0.5)    # distància desitjada a la paret
+        self.declare_parameter('forward_speed', 0.10)    # velocitat nominal en x
+        self.declare_parameter('strafe_speed', 0.10)     # velocitat lateral |vy|
+        self.declare_parameter('turn_speed', 0.25)       # velocitat angular màxima
         self.declare_parameter('time_to_stop', 30.0)     # auto-stop
-        self.declare_parameter('tolerance', 0.05)        # not used for holonomic rules now
-        self.declare_parameter('k_ang', 1.0)             # proportional gain for yaw control
+        self.declare_parameter('tolerance', 0.05)
+        self.declare_parameter('k_ang', 1.0)             # guany proporcional del control de yaw
 
         self.base_distance = float(self.get_parameter('distance_limit').value)
         self.v_lin = float(self.get_parameter('forward_speed').value)
@@ -34,6 +34,14 @@ class WallFollowerHolonomic(Node):
         # Odometry / orientation
         self.current_yaw = 0.0
         self.odom_received = False
+
+        # Estat per detectar paret "estable"
+        self.start_time_s = self.get_clock().now().nanoseconds * 1e-9
+        self.stable_wall_time = 2.0  # segons que ha d'estar a la mateixa paret
+        self.last_region = None
+        self.last_region_change_time = self.start_time_s
+        self.wall_align_active = False
+        self.target_yaw = 0.0  # orientació objectiu quan decidim alinear-nos amb la paret
 
         # ROS 2 entities
         self.subscription = self.create_subscription(
@@ -53,17 +61,15 @@ class WallFollowerHolonomic(Node):
         self._last_action_logged = None
         self._shutting_down = False
 
-        self.start_time_s = self.get_clock().now().nanoseconds * 1e-9
-
         self.get_logger().info(
-            "WallFollower HOLONOMIC – vx, vy, w with full left/right handling and yaw alignment."
+            "WallFollower HOLONOMIC – vx, vy, w amb alineació de yaw i velocitats reduïdes."
         )
 
     # --------------------------------------------------------------------
     def odom_callback(self, msg: Odometry):
         """Read current yaw from /odom."""
         q = msg.pose.pose.orientation
-        # Yaw from quaternion (z-w)
+        # Yaw from quaternion
         siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         self.current_yaw = math.atan2(siny_cosp, cosy_cosp)
@@ -77,6 +83,26 @@ class WallFollowerHolonomic(Node):
         while angle < -math.pi:
             angle += 2.0 * math.pi
         return angle
+
+    # --------------------------------------------------------------------
+    def compute_target_yaw_from_region(self, region: str) -> float:
+        """
+        Defineix quina orientació volem quan portem un temps amb una paret concreta.
+        Ara mateix:
+        - Paret a la dreta o variants → yaw = 0.0 (anar endavant, paret al costat)
+        - Paret a l'esquerra → també 0.0
+        - Paret darrere → pi (girar 180º)
+        Pots canviar-ho fàcilment (p. ex. RIGHT → math.pi/2.0 si vols 90º).
+        """
+        if region in ["RIGHT", "FR_RIGHT", "BACK_RIGHT"]:
+            return 0.0
+        elif region in ["LEFT", "FR_LEFT", "BACK_LEFT"]:
+            return 0.0
+        elif region == "BACK":
+            return math.pi
+        else:
+            # FRONT o sense res especial → mantenim 0
+            return 0.0
 
     # --------------------------------------------------------------------
     def stop_watchdog(self):
@@ -145,7 +171,7 @@ class WallFollowerHolonomic(Node):
 
             ang = angle_min + i * angle_inc
 
-            # Right side
+            # Right side (angles negatius o propers al davant)
             if -20 <= ang <= 20:
                 FRONT.append(d)
             elif -70 <= ang < -20:
@@ -157,7 +183,7 @@ class WallFollowerHolonomic(Node):
             elif ang <= -160:
                 BACK.append(d)
 
-            # Left side (mirror)
+            # Left side
             elif 20 < ang <= 70:
                 FR_LEFT.append(d)
             elif 70 < ang <= 110:
@@ -165,7 +191,7 @@ class WallFollowerHolonomic(Node):
             elif 110 < ang <= 160:
                 BACK_LEFT.append(d)
             elif ang >= 160:
-                BACK.append(d)  # also behind
+                BACK.append(d)  # també darrere
 
         # Minimal distances per region
         min_front      = min(FRONT)      if FRONT      else float('inf')
@@ -196,9 +222,32 @@ class WallFollowerHolonomic(Node):
         closest_region = min(region_mins, key=region_mins.get)
         closest_dist = region_mins[closest_region]
 
-        # --- 1) Decide ONLY linear velocities segons la paret ---
+        # --- Detectar si portem temps amb la mateixa paret ---
+        now = self.get_clock().now().nanoseconds * 1e-9
+
+        if closest_region != self.last_region:
+            # Ha canviat la paret més propera → reiniciem comptador
+            self.last_region = closest_region
+            self.last_region_change_time = now
+            self.wall_align_active = False
+        else:
+            # Mateixa regió que abans
+            time_same_wall = now - self.last_region_change_time
+            if (closest_dist < float('inf') and
+                time_same_wall > self.stable_wall_time and
+                not self.wall_align_active):
+
+                # Activem mode "alineat amb la paret"
+                self.wall_align_active = True
+                self.target_yaw = self.compute_target_yaw_from_region(closest_region)
+                self.get_logger().info(
+                    f"Wall {closest_region} estable durant {time_same_wall:.1f}s → "
+                    f"alineant orientació (target_yaw={self.target_yaw:.2f} rad)"
+                )
+
+        # --- 1) Decidir només velocitats lineals segons la paret ---
         if closest_dist == float('inf') or closest_dist > self.base_distance:
-            # Nothing close → go forward
+            # Res a prop → endavant
             twist.linear.x = self.v_lin
             twist.linear.y = 0.0
             action = "No close wall → move FORWARD"
@@ -210,63 +259,67 @@ class WallFollowerHolonomic(Node):
                 action = f"FRONT {closest_dist:.2f} m → move LEFT (vy>0)"
 
             elif closest_region == "FR_RIGHT":
-                # Paret front-dreta → mou-te front-esquerra
+                # Paret front-dreta → front-esquerra
                 twist.linear.x = self.v_lin
                 twist.linear.y = self.v_strafe
                 action = f"FRONT-RIGHT {closest_dist:.2f} m → move FRONT-LEFT"
 
             elif closest_region == "RIGHT":
-                # Paret dreta → mou-te endavant (seguint la paret a la dreta)
+                # Paret dreta → endavant
                 twist.linear.x = self.v_lin
                 twist.linear.y = 0.0
                 action = f"RIGHT {closest_dist:.2f} m → move FORWARD (parallel to right wall)"
 
             elif closest_region == "BACK_RIGHT":
-                # Paret darrere-dreta → mou-te front-dreta
+                # Paret darrere-dreta → front-dreta
                 twist.linear.x = self.v_lin
                 twist.linear.y = -self.v_strafe
                 action = f"BACK-RIGHT {closest_dist:.2f} m → move FRONT-RIGHT"
 
             elif closest_region == "BACK":
-                # Paret darrere → mou-te cap a la dreta
+                # Paret darrere → cap a la dreta
                 twist.linear.x = 0.0
                 twist.linear.y = -self.v_strafe
                 action = f"BACK {closest_dist:.2f} m → move RIGHT (vy<0)"
 
             elif closest_region == "FR_LEFT":
-                # Paret front-esquerra → mou-te BACK-LEFT (exemple)
+                # Paret front-esquerra → BACK-LEFT (per exemple)
                 twist.linear.x = -self.v_lin
                 twist.linear.y = self.v_strafe
                 action = f"FRONT-LEFT {closest_dist:.2f} m → move BACK-LEFT"
 
             elif closest_region == "LEFT":
-                # Paret esquerra → mou-te enrere (o com vulguis)
+                # Paret esquerra → enrere
                 twist.linear.x = -self.v_lin
                 twist.linear.y = 0.0
                 action = f"LEFT {closest_dist:.2f} m → move BACKWARD"
 
             elif closest_region == "BACK_LEFT":
-                # Paret darrere-esquerra → mou-te BACK-RIGHT
+                # Paret darrere-esquerra → BACK-RIGHT
                 twist.linear.x = -self.v_lin
                 twist.linear.y = -self.v_strafe
                 action = f"BACK-LEFT {closest_dist:.2f} m → move BACK-RIGHT"
 
-        # --- 2) Orientació: fer que el robot miri cap a la direcció de moviment ---
+        # --- 2) Orientació: yaw segons moviment o segons paret estable ---
         vx = twist.linear.x
         vy = twist.linear.y
 
         if abs(vx) < 1e-3 and abs(vy) < 1e-3:
-            # Si no hi ha moviment → no girem
+            # Si no ens movem → no girem
             twist.angular.z = 0.0
         else:
-            # Angle de la direcció de moviment en l'eix del robot
-            desired_yaw = math.atan2(vy, vx)   # ex: vx=0, vy>0 → +90º
+            # Si ja hem detectat una paret "estable", fem servir target_yaw
+            if self.wall_align_active:
+                desired_yaw = self.target_yaw
+            else:
+                # Si no, intentem mirar cap a on ens estem movent
+                desired_yaw = math.atan2(vy, vx)
 
             if self.odom_received:
                 yaw_error = self.normalize_angle(desired_yaw - self.current_yaw)
                 w_cmd = self.k_ang * yaw_error
 
-                # Limitem la velocitat angular màxima
+                # Limitar velocitat angular
                 if w_cmd > self.v_ang:
                     w_cmd = self.v_ang
                 elif w_cmd < -self.v_ang:
@@ -274,7 +327,6 @@ class WallFollowerHolonomic(Node):
 
                 twist.angular.z = w_cmd
             else:
-                # Encara no tenim /odom → no girem per seguretat
                 twist.angular.z = 0.0
 
         # Update last commanded twist
