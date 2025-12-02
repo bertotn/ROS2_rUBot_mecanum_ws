@@ -142,11 +142,11 @@ To navigate programmatically using Simple Commander API, you have to proceed wit
 - Start the navigation2.launch.py with rviz to see the evolution of robot navigation
     - In the case of Virtual environment:
         ````shell
-        ros2 launch my_robot_navigation2 navigation2_robot.launch.py robot:=robot_arm/my_simple_robot.urdf map_file:=map_square4m_sign.yaml params_file:=rubot_sw.yaml
+        ros2 launch my_robot_navigation2 navigation2_robot.launch.py use_sim_time:=true map_file:=map_square4m_sign.yaml params_file:=rubot_sw.yaml
         ````
         - In the case of real robot:
         ````shell
-        ros2 launch my_robot_navigation2 navigation2_robot.launch.py use_sim_time:=false robot:=robot_arm/my_simple_robot.urdf map_file:=map_square4m_sign.yaml params_file:=rubot_real.yaml
+        ros2 launch my_robot_navigation2 navigation2_robot.launch.py use_sim_time:=false map_file:=map_square4m_sign.yaml params_file:=rubot_real.yaml
         ````
         > Here is important to specify `use_sim_time:=false` for real robot. In `navigation2_robot.launch.py` file is set to true by default.
 - Launch the created python file to define the Initial point and one target point defined in nav_target.py file:
