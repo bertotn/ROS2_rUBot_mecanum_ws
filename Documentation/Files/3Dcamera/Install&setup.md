@@ -4,15 +4,15 @@ This camera could be installed on:
 - PC Ubuntu 22 with ROS2 Humble
 - Raspberrypi4 Ubuntu 22 with ROS2 Humble
 
-The installation process is the same in both cases.
+The installation process in **PC Ubuntu 22**:
 
-Proceed with:
 ```bash
 sudo apt install -y git cmake build-essential \
   libssl-dev libusb-1.0-0-dev libudev-dev pkg-config \
-  libgtk-3-dev libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev
+  libgtk-3-dev libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev \
+  librealsense2-dkms librealsense2-utils
 
-mkdir -p ~/repos && cd ~/repos
+mkdir -p ~/software && cd ~/software
 git clone https://github.com/IntelRealSense/librealsense.git
 cd librealsense
 sudo ./scripts/setup_udev_rules.sh
@@ -23,27 +23,53 @@ sudo make install
 
 realsense-viewer
 ```
+Here is interesting to change to a more stable firmware version for D435/i:
+5.12.15.50. This can be done in the "Device" tab -> "Update Firmware".
+
 To install the wrapper ROS2:
 ```bash
 sudo apt install ros-humble-realsense2-camera ros-humble-realsense2-description
-# Launch with default params values
-ros2 launch realsense2_camera rs_launch.py
-# Llançament amb resolució més baixa per anar més fi
+````
+The launch file with default parameters:
+```bash
 ros2 launch realsense2_camera rs_launch.py \
   rgb_camera.color_profile:=640x480x15 \
   depth_module.depth_profile:=640x360x15 \
   pointcloud.enable:=false
-rviz2
 ```
-When camera is on raspberrypi is recommeded:
-```bash
-ros2 launch realsense2_camera rs_launch.py \
-  depth_module.depth_profile:=640x360x15 \
-  rgb_camera.color_profile:=640x480x15 \
-  pointcloud.enable:=false \
-  enable_gyro:=false \
-  enable_accel:=false
-```
+When camera is on **raspberrypi** you have to:
+- add a patch to it kernel:
+  ````bash
+  cd ~/software/librealsense
+  sudo ./scripts/setup_udev_rules.sh
+  sudo ./scripts/patch-realsense-ubuntu-lts-hwe.sh
+  ````
+- Increase the ùsbfs_memory` to 512:
+  - open the file:
+    ```bash
+    sudo nano /boot/firmware/cmdline.txt
+    ````
+  - add at the end of line:
+    ````bash
+    usbcore.usbfs_memory_mb=512
+    ````
+  - reboot the raspberrypi
+- change to a more stable firmware version for D435/i:
+5.12.15.50.
+
+- Use the launch file with custom parameters:
+  ```bash
+  ros2 launch realsense2_camera rs_launch.py \
+    initial_reset:=true \
+    enable_color:=true \
+    enable_depth:=true \
+    align_depth:=true \
+    enable_sync:=false \
+    pointcloud.enable:=false \
+    depth_module.depth_profile:=640x360x15 \
+    rgb_camera.color_profile:=640x480x30 \
+    enable_infra1:=false enable_infra2:=false
+  ```
 
 # Install Orbbec DaBai
 

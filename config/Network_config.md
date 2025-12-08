@@ -202,3 +202,122 @@ Each robot and PC must have:
 
 
 This approach keeps the lab configuration clear, reproducible, and independent of the router’s multicast behavior.
+
+## 5. Time Synchronization
+
+Make sure PC and Robot (Raspberry Pi) have the same system time using built-in NTP.
+
+
+Matching time helps with:
+
+- TF transforms
+
+- Logging
+
+- Sensor fusion
+
+- Debugging timestamped data
+
+(ROS 2 discovery does NOT depend on clock sync, but TF and logs do.)
+
+### On the PC (Ubuntu 22) and robot (Raspberry Pi Ubuntu 22):
+
+- Check current time sync status
+    ````bash
+    timedatectl status
+    ````
+
+- It should show:
+
+    - System clock synchronized: yes
+
+    - NTP service: active
+
+    - Time zone: Europe/Madrid (or your timezone)
+
+- If not, enable NTP:
+    ````bash
+    # Enable automatic NTP time synchronization
+    sudo timedatectl set-ntp true
+    # Set your timezone
+    sudo timedatectl set-timezone Europe/Madrid
+    # Check again
+    timedatectl status
+    ````
+
+
+### On Docker containers
+
+No extra configuration needed.
+
+Containers inherit the host’s system clock, so:
+
+- If the PC clock is correct → the container clock is correct.
+
+- Mounting /etc/localtime is only for correct timezone display, not time sync.
+
+    ````yaml
+    volumes:
+    - /etc/localtime:/etc/localtime:ro   # timezone only (not time sync)
+    ````
+
+# Install ROS2 environment on GEI lab computers
+
+We will use a proper docker-compose setup to run ROS2 Humble with CycloneDDS on the lab computers.
+
+First of all, a proper Docker Image has been created with the custom configuration on Dockerfile and uploades to my Docker Hub account.
+- In the folder where your Dockerfile is:
+    ````bash
+    docker build -t ros2-humble-biorobub-pc:latest .
+    ````
+- Tag the image for Docker Hub
+    ````bash
+    docker tag ros2-humble-biorobub-pc:latest manelpuig/ros2-humble-biorobub-pc:latest
+    ````
+- Login to Docker Hub from terminal and follow instructions to autenticate
+    ````bash
+    docker login
+    ````
+- Push the image to Docker Hub
+    ````bash
+    docker push manelpuig/ros2-humble-biorobub-pc:latest
+    ````
+- Once the image is pushed properly to my Dockerhub account, I have to delete the local image tag:
+    ````bash
+    docker rmi ros2-humble-biorobub-pc:latest
+    ````
+Students in the lab they only need to run:
+- Unzip the `ros2-humble-biorobub.zip` file in a /home/user/Desktop/rob folder on Linux PC
+
+- review the:
+    - `ROS_DOMAIN_ID` variable in the `docker-compose.yml` file and `Dockerfile` to match your lab setup.
+    - IPs in `cyclonedds_pc.xml` files to match your lab setup.
+- Open a terminal in the `/home/user/Desktop/rob/ros2-humble-biorobub` folder and run:
+    ````bash
+    xhost +local:root            # permet X11 per al container
+    cd ~/Desktop/ros2-humble-biorobub
+    docker-compose up -d
+    docker exec -it pc_humble bash
+    ros2 topic list
+    ````
+
+## Previous installation
+
+Becauseof the PCs are frozen, we have first to install:
+- Install Docker and docker-compose (or docker compose plugin):
+    ````bash
+    sudo apt install docker.io docker-compose
+    ````
+
+- Add students to the docker group so they can run Docker without sudo:
+    ````shell
+    sudo usermod -aG docker student
+    ````
+    (Then they log out and log back in.)
+
+- Install Vscode from apt:
+    ````bash
+    sudo snap install --classic code
+    ````
+
+If this is done once in the base frozen image, students won’t need to reinstall it each day.

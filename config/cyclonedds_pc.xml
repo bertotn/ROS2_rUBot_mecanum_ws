@@ -1,16 +1,20 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <CycloneDDS>
-<Domain id="any">
+  <Domain id="any">
     <General>
-    <!-- Bind CycloneDDS to the PC's IP address -->
-    <NetworkInterfaceAddress>192.168.1.55</NetworkInterfaceAddress>
-    <AllowMulticast>true</AllowMulticast>
+      <AllowMulticast>true</AllowMulticast>
     </General>
+
+    <Interfaces>
+      <!-- Lliga CycloneDDS a la IP del PC -->
+      <NetworkInterface name="192.168.1.55"/>
+    </Interfaces>
+
     <Discovery>
-    <!-- Explicitly add the robot as a unicast peer -->
-    <Peers>
+      <Peers>
+        <!-- Robot -->
         <Peer address="192.168.1.54"/>
-    </Peers>
+      </Peers>
     </Discovery>
-</Domain>
+  </Domain>
 </CycloneDDS>
