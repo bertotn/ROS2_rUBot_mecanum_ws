@@ -23,8 +23,8 @@ sudo make install
 
 realsense-viewer
 ```
-Here is interesting to change to a more stable firmware version for D435/i:
-5.12.15.50. This can be done in the "Device" tab -> "Update Firmware".
+Here is interesting to change to a more stable firmware version for D435/i: version
+`5.12.15.50`. This can be done in the "Device" tab -> "Update Firmware".
 
 To install the wrapper ROS2:
 ```bash
@@ -37,14 +37,14 @@ ros2 launch realsense2_camera rs_launch.py \
   depth_module.depth_profile:=640x360x15 \
   pointcloud.enable:=false
 ```
-When camera is on **raspberrypi** you have to:
-- add a patch to it kernel:
+When camera is on **raspberrypi**, the installation instructions are equivalent, but you have to:
+- add a patch to it kernel (after step `cd librealsense`):
   ````bash
   cd ~/software/librealsense
   sudo ./scripts/setup_udev_rules.sh
   sudo ./scripts/patch-realsense-ubuntu-lts-hwe.sh
   ````
-- Increase the ùsbfs_memory` to 512:
+- Increase the `usbfs_memory` to 512:
   - open the file:
     ```bash
     sudo nano /boot/firmware/cmdline.txt
@@ -54,8 +54,8 @@ When camera is on **raspberrypi** you have to:
     usbcore.usbfs_memory_mb=512
     ````
   - reboot the raspberrypi
-- change to a more stable firmware version for D435/i:
-5.12.15.50.
+- change to a more stable firmware version for D435/i: version
+`5.12.15.50`. This can be done in the "Device" tab -> "Update Firmware".
 
 - Use the launch file with custom parameters:
   ```bash
