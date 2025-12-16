@@ -266,7 +266,6 @@ def main(args=None):
             node.destroy_node()
         except Exception:
             pass
-
         if rclpy.ok():
             rclpy.shutdown()
 
