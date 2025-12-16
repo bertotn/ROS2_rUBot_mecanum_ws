@@ -10,11 +10,11 @@ class WallFollower(Node):
         super().__init__('wall_follower_node')
 
         # Parameters
-        self.declare_parameter('distance_limit', 0.3)    # desired distance to right wall
+        self.declare_parameter('distance_limit', 0.1)    # desired distance to right wall
         self.declare_parameter('forward_speed', 0.20)    # linear speed
         self.declare_parameter('turn_speed', 0.20)       # angular speed
         self.declare_parameter('time_to_stop', 30.0)     # auto-stop
-        self.declare_parameter('tolerance', 0.05)        # band around base_distance (RIGHT)
+        self.declare_parameter('tolerance', 0.01)        # band around base_distance (RIGHT)
 
         self.base_distance = float(self.get_parameter('distance_limit').value)
         self.v_lin = float(self.get_parameter('forward_speed').value)
