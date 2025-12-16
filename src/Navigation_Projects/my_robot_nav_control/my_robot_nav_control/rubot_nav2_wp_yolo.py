@@ -16,9 +16,9 @@ class NavigationTask(Node):
 
         # --- Parameters ---
         # [x, y, yaw]
-        self.declare_parameter('initial_pose', [0.0, 0.0, 0.0])
-        self.declare_parameter('target_pose', [5.0, 3.0, 0.0])
-        self.declare_parameter('waypoint', [2.0, 1.0, 0.0])
+        self.declare_parameter('initial_pose', [0.0,0.0,0.0])
+        self.declare_parameter('target_pose', [3.5,-0.2,1.57])
+        self.declare_parameter('waypoint', [2.1,0.6,1.57])
         self.declare_parameter('wait_for_traffic_wp', 5.0)  # seconds
 
         self.initial_pose_xyz = self.get_parameter('initial_pose').value

@@ -60,7 +60,7 @@ To proceed with the signal identification we first bringup the robot and navigat
             - base_link: as the ``robot_base_frame``
         - We have to create "LIMO_real.yaml" file in "param" folder correcting base_frame_id: "odom" (instead of base_footprint)
         ````shell
-        ros2 launch my_robot_navigation2 navigation2_robot.launch.py use_sim_time:=false map_file:=map_square4m_sign.yaml params_file:=limo_real.yaml
+        ros2 launch my_robot_navigation2 navigation2_robot.launch.py use_sim_time:=false map_file:=map_project.yaml params_file:=rubot_real.yaml
         ````
         > Be sure the Odometry message is zero when starting the navigation.
 
@@ -144,11 +144,11 @@ To launch the robot Custom Navigation with signal detection, use:
     ````
 - Launch the `custom_nav2` node with:
     ````shell
-    ros2 launch my_robot_nav_control rubot_nav2_wp_yolo.launch.py target_pose:=[8.0, -0.5, 1.57]
+    ros2 launch my_robot_nav_control rubot_nav2_wp_yolo.launch.py target_pose:=[3.5,-0.2, 1.57]
     ````
 - use ``rqt_image_view`` in a new terminal
     ````shell
-    rqt_image_view /inference_result
+    ros2 run rqt_image_view rqt_image_view /inference_result
     ````
 
 ## **5. Distance with 3D-Camera**

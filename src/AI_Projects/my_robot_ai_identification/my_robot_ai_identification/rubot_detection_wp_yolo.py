@@ -154,15 +154,15 @@ class YoloObjectDetection(Node):
         sx, sy = self.sign_positions[sign_name]
 
         # Lateral offset distance in meters
-        d = 0.5
+        d = 0.3
 
         # Use robot yaw to define lateral directions
         if side == 'right':
-            wx = sx + d * math.sin(self.robot_yaw)
-            wy = sy - d * math.cos(self.robot_yaw)
+            wx = sx + d #* math.sin(self.robot_yaw)
+            wy = sy - d #* math.cos(self.robot_yaw)
         else:  # 'left'
-            wx = sx - d * math.sin(self.robot_yaw)
-            wy = sy + d * math.cos(self.robot_yaw)
+            wx = sx + d #* math.sin(self.robot_yaw)
+            wy = sy + d #* math.cos(self.robot_yaw)
 
         pose = PoseStamped()
         pose.header.frame_id = "map"  # assume sign_positions are in 'map' frame

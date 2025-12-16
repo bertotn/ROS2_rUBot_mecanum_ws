@@ -146,15 +146,20 @@ To navigate programmatically using Simple Commander API, you have to proceed wit
         ````
         - In the case of real robot:
         ````shell
-        ros2 launch my_robot_navigation2 navigation2_robot.launch.py use_sim_time:=false map_file:=map_square4m_sign.yaml params_file:=rubot_real.yaml
+        ros2 launch my_robot_navigation2 navigation2_robot.launch.py use_sim_time:=false map_file:=map_project.yaml params_file:=rubot_real.yaml
         ````
         > Here is important to specify `use_sim_time:=false` for real robot. In `navigation2_robot.launch.py` file is set to true by default.
-- Launch the created python file to define the Initial point and one target point defined in nav_target.py file:
-    ````shell
-    ros2 launch my_robot_nav_control nav_target.launch.py
-    ````
+
 - Launch the created python file to define the Initial point and some targets waypoints defined in config folder:
     ````
     ros2 launch my_robot_nav_control nav_waypoints.launch.py
     ````
-    >First time we pass the 2D-Pose-Estimate but not the successive times
+- The params are described in `waypoints_params.yaml` file in config folder:
+    ````yaml
+    nav_waypoints_node:
+        ros__parameters:
+            initial_pose: '(0.0,0.0,0.0)'
+            waypoints: '[(1.5,0.7,0.2), (3.4,0.5,-0.3)]'
+            final_pose: '(4.7,0.5,1.57)'
+    ````
+    > If waypoints list is empty `waypoints: '[]'` the robot will navigate only from initial_pose to final_pose
